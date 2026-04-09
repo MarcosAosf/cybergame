@@ -1,0 +1,299 @@
+import { create } from 'zustand';
+
+export type RankLevel = 'Novice' | 'Junior Analyst' | 'Security Specialist' | 'Elite Hacker' | 'Network Master';
+export type League = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
+
+// --- Black Market Item Types ---
+export type MarketItemType = 'title' | 'profile_fx' | 'access_key';
+
+export interface MarketItem {
+  id: string;
+  type: MarketItemType;
+  name: string;
+  description: string;
+  cost: number;
+  purchased: boolean;
+  equipped?: boolean;
+}
+
+// --- Bit Reward Scale ---
+export const BIT_REWARDS = {
+  COMMON_LESSON: 50,
+  ADVANCED_LAB: 150,
+  PERFECT_SCORE_BONUS: 50,
+  EMERGENCY_TASK: 450, // 3x Common reward
+} as const;
+
+export const EMERGENCY_ON_FIRE_DURATION_MS = 60000; // 60 seconds
+
+// --- Black Market Catalog ---
+export const BLACK_MARKET_CATALOG: Omit<MarketItem, 'purchased' | 'equipped'>[] = [
+  // Custom Titles
+  { id: 'title_encryptor', type: 'title', name: '[ENCRYPTOR]', description: 'Título equipável de operador especializado em criptografia.', cost: 1000 },
+  { id: 'title_zero_day', type: 'title', name: '[ZERO_DAY]', description: 'Título equipável de operador que descobriu uma vulnerabilidade crítica.', cost: 2500 },
+  { id: 'title_oblivion', type: 'title', name: '[OBLIVION_OPERATOR]', description: 'Título equipável de operador que executa em silêncio absoluto.', cost: 5000 },
+  // Profile FX
+  { id: 'fx_static_glitch', type: 'profile_fx', name: 'Static Glitch Effect', description: 'Efeito de ruído estático no perfil do Dossier.', cost: 1500 },
+  { id: 'fx_neon_border', type: 'profile_fx', name: 'Neon Border Glow', description: 'Aura neon em sua linha no grid de Ranking.', cost: 3000 },
+  // Access Keys
+  { id: 'key_legacy_archive', type: 'access_key', name: 'Legacy Archive', description: 'Desbloqueia lições ocultas do arquivo legado da SecRoad.', cost: 10000 },
+];
+
+interface UserProfile {
+  name: string;
+  rank: RankLevel;
+  avatar: string;
+  totalXP: number;
+  completedLessons: number;
+  equippedTitle?: string; // The equipped custom title
+}
+
+interface Stats {
+  hearts: number;
+  streak: number;
+  bits: number;
+  credits: number;
+}
+
+interface SecState {
+  user: UserProfile;
+  stats: Stats;
+  completedLessonIds: string[];
+  breachLogs: Array<{ id: string, timestamp: string, layer: string, title: string }>;
+  isGraduated: boolean;
+  graduationDate: string | null;
+  isOnFire: boolean;
+  onFireExpiresAt: number | null;
+  emergencyTasksCompleted: number;
+  market: MarketItem[];
+  lastBitsEarned: number | null; // For toast notification
+
+  // Actions
+  completeLesson: (lessonId: string, xpGain: number, bitsGain: number, hintsUsed: boolean, isAdvanced?: boolean, isPerfect?: boolean) => void;
+  completeEmergencyTask: () => void;
+  doubleBits: () => void;
+  loseHeart: () => void;
+  addHeart: () => void;
+  useCredit: () => void;
+  buyHeart: (cost: number) => boolean;
+  buyCredits: (amount: number, cost: number) => boolean;
+  purchaseItem: (itemId: string) => { success: boolean; message: string };
+  equipTitle: (titleId: string) => void;
+  deductBits: (amount: number) => boolean;
+  clearBitsToast: () => void;
+  resetProgress: () => void;
+
+  // Getters
+  getLeague: () => { tier: League; progressToNext: number; totalToNext: number };
+  hasPurchased: (itemId: string) => boolean;
+  hasEffect: (effectId: string) => boolean;
+}
+
+const buildInitialMarket = (): MarketItem[] =>
+  BLACK_MARKET_CATALOG.map(item => ({ ...item, purchased: false, equipped: false }));
+
+export const useSecStore = create<SecState>((set, get) => ({
+  user: {
+    name: 'Operator',
+    rank: 'Novice',
+    avatar: 'Default',
+    totalXP: 0,
+    completedLessons: 0,
+    equippedTitle: undefined,
+  },
+  stats: {
+    hearts: 5,
+    streak: 0,
+    bits: 100,
+    credits: 3,
+  },
+  completedLessonIds: [],
+  breachLogs: [],
+  isGraduated: false,
+  graduationDate: null,
+  isOnFire: false,
+  onFireExpiresAt: null,
+  emergencyTasksCompleted: 0,
+  market: buildInitialMarket(),
+  lastBitsEarned: null,
+
+  completeLesson: (lessonId, xpGain, bitsGain, hintsUsed, isAdvanced = false, isPerfect = false) => {
+    const { completedLessonIds, user, stats } = get();
+    if (completedLessonIds.includes(lessonId)) return;
+
+    const newCompletedCount = user.completedLessons + 1;
+
+    let newRank = user.rank;
+    if (newCompletedCount >= 10) newRank = 'Elite Hacker';
+    else if (newCompletedCount >= 5) newRank = 'Security Specialist';
+    else if (newCompletedCount >= 1) newRank = 'Junior Analyst';
+
+    // Bit Economy Engine: Reward Scale
+    const baseReward = isAdvanced ? BIT_REWARDS.ADVANCED_LAB : BIT_REWARDS.COMMON_LESSON;
+    const perfectBonus = isPerfect ? BIT_REWARDS.PERFECT_SCORE_BONUS : 0;
+    const totalBitsEarned = bitsGain > 0 ? bitsGain : baseReward + perfectBonus;
+
+    set({
+      user: {
+        ...user,
+        totalXP: Number(user.totalXP) + Number(xpGain),
+        completedLessons: newCompletedCount,
+        rank: newRank as RankLevel,
+      },
+      stats: {
+        ...stats,
+        bits: Number(stats.bits) + Number(totalBitsEarned),
+        hearts: !hintsUsed ? Math.min(5, stats.hearts + 1) : stats.hearts,
+        credits: Math.min(5, stats.credits + 1),
+      },
+      completedLessonIds: [...completedLessonIds, lessonId],
+      lastBitsEarned: totalBitsEarned,
+      breachLogs: [
+        {
+          id: lessonId,
+          timestamp: new Date().toLocaleTimeString(),
+          layer: lessonId.startsWith('l1') ? '01' :
+                 lessonId.startsWith('l2') ? '02' :
+                 lessonId.startsWith('l4') ? '04' :
+                 lessonId.startsWith('l7') ? '07' : 'XX',
+          title: 'ACESSO_GARANTIDO'
+        },
+        ...get().breachLogs.slice(0, 49)
+      ]
+    });
+
+    // Graduation Check
+    const { completedLessonIds: updatedIds } = get();
+    const hasL1 = updatedIds.some(id => id.startsWith('l1'));
+    const hasL2 = updatedIds.some(id => id.startsWith('l2'));
+    const hasL4 = updatedIds.some(id => id.startsWith('l4'));
+    const hasL7 = updatedIds.some(id => id.startsWith('l7'));
+
+    if (hasL1 && hasL2 && hasL4 && hasL7 && !get().isGraduated) {
+      set({ isGraduated: true, graduationDate: new Date().toLocaleDateString() });
+    }
+  },
+
+  clearBitsToast: () => set({ lastBitsEarned: null }),
+
+  completeEmergencyTask: () => {
+    const { stats, emergencyTasksCompleted } = get();
+    const reward = BIT_REWARDS.EMERGENCY_TASK;
+    const expiresAt = Date.now() + EMERGENCY_ON_FIRE_DURATION_MS;
+    set({
+      stats: { ...stats, bits: Number(stats.bits) + reward },
+      lastBitsEarned: reward,
+      isOnFire: true,
+      onFireExpiresAt: expiresAt,
+      emergencyTasksCompleted: emergencyTasksCompleted + 1,
+    });
+    // Auto-expire ON_FIRE status
+    setTimeout(() => {
+      if (Date.now() >= (get().onFireExpiresAt ?? 0)) {
+        set({ isOnFire: false, onFireExpiresAt: null });
+      }
+    }, EMERGENCY_ON_FIRE_DURATION_MS);
+  },
+
+  deductBits: (amount: number) => {
+    const { stats } = get();
+    if (Number(stats.bits) < amount) return false;
+    set({ stats: { ...stats, bits: Number(stats.bits) - amount } });
+    return true;
+  },
+
+  purchaseItem: (itemId: string) => {
+    const { market, stats } = get();
+    const item = market.find(i => i.id === itemId);
+    if (!item) return { success: false, message: '// ITEM_NOT_FOUND: INVALID_ID' };
+    if (item.purchased) return { success: false, message: '// ALREADY_OWNED: ITEM_IN_ARCHIVE' };
+    if (Number(stats.bits) < item.cost) {
+      return { success: false, message: `// INSUFFICIENT_FUNDS: ACCESS_DENIED (Need ${item.cost - stats.bits} more bits)` };
+    }
+    set({
+      stats: { ...stats, bits: Number(stats.bits) - item.cost },
+      market: market.map(i => i.id === itemId ? { ...i, purchased: true } : i),
+    });
+    return { success: true, message: `// ACQUISITION_COMPLETE: ${item.name}` };
+  },
+
+  equipTitle: (titleId: string) => {
+    const { market, user } = get();
+    const item = market.find(i => i.id === titleId && i.purchased && i.type === 'title');
+    if (!item) return;
+    set({
+      user: { ...user, equippedTitle: item.name },
+      market: market.map(i => i.type === 'title' ? { ...i, equipped: i.id === titleId } : i),
+    });
+  },
+
+  doubleBits: () => {
+    const { stats } = get();
+    set({ stats: { ...stats, bits: Math.floor(Number(stats.bits) * 2) } });
+  },
+
+  loseHeart: () => {
+    set((state) => ({ stats: { ...state.stats, hearts: Math.max(0, state.stats.hearts - 1) } }));
+  },
+
+  addHeart: () => {
+    set((state) => ({ stats: { ...state.stats, hearts: Math.min(5, state.stats.hearts + 1) } }));
+  },
+
+  useCredit: () => {
+    set((state) => ({ stats: { ...state.stats, credits: Math.max(0, state.stats.credits - 1) } }));
+  },
+
+  buyHeart: (cost) => {
+    const { stats } = get();
+    if (Number(stats.bits) >= Number(cost) && stats.hearts < 5) {
+      set({ stats: { ...stats, bits: Number(stats.bits) - Number(cost), hearts: stats.hearts + 1 } });
+      return true;
+    }
+    return false;
+  },
+
+  buyCredits: (amount, cost) => {
+    const { stats } = get();
+    if (Number(stats.bits) >= Number(cost)) {
+      set({ stats: { ...stats, bits: Number(stats.bits) - Number(cost), credits: Math.min(10, stats.credits + Number(amount)) } });
+      return true;
+    }
+    return false;
+  },
+
+  refillHearts: () => {
+    set((state) => ({ stats: { ...state.stats, hearts: 5, credits: 3 } }));
+  },
+
+  resetProgress: () => {
+    set({
+      user: { name: 'Operator', rank: 'Novice', avatar: 'Default', totalXP: 0, completedLessons: 0, equippedTitle: undefined },
+      stats: { hearts: 5, streak: 0, bits: 100, credits: 3 },
+      completedLessonIds: [],
+      breachLogs: [],
+      isGraduated: false,
+      graduationDate: null,
+      isOnFire: false,
+      onFireExpiresAt: null,
+      emergencyTasksCompleted: 0,
+      market: buildInitialMarket(),
+      lastBitsEarned: null,
+    });
+  },
+
+  getLeague: () => {
+    const lessons = get().user.completedLessons;
+    if (lessons >= 16) return { tier: 'Gold', progressToNext: 0, totalToNext: 0 };
+    if (lessons >= 6) return { tier: 'Silver', progressToNext: lessons - 6, totalToNext: 10 };
+    return { tier: 'Bronze', progressToNext: lessons, totalToNext: 6 };
+  },
+
+  hasPurchased: (itemId: string) => {
+    return get().market.find(i => i.id === itemId)?.purchased ?? false;
+  },
+
+  hasEffect: (effectId: string) => {
+    return get().market.find(i => i.id === effectId)?.purchased ?? false;
+  },
+}));
