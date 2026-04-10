@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, Image, Animated } from 'react-native';
-import { useAudio } from './AudioProvider';
+import { useAudio } from '../hooks/useAudio';
 
 interface RoadNodeProps {
   id: string;
@@ -27,19 +27,8 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
   const pulseAnim = useRef(new Animated.Value(1)).current;
   // Secondary Halo Animation (Master Glow)
   const haloAnim = useRef(new Animated.Value(0)).current;
-  // Challenge Flicker Animation
-  const flickerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (variant === 'challenge') {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(flickerAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-          Animated.timing(flickerAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-        ])
-      ).start();
-    }
-
     if (isCompleted) {
       Animated.loop(
         Animated.sequence([
@@ -107,24 +96,18 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
           />
         )}
 
-        {/* RED CHALLENGE HALO */}
+        {/* BLUE/SILVER CHALLENGE HALO - Steady Glow */}
         {variant === 'challenge' && (
-          <Animated.View 
-            style={[
-              styles.challengeHalo,
-              { opacity: flickerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.8] }) }
-            ]}
-          />
+          <View style={[styles.challengeHalo, { opacity: 0.4 }]} />
         )}
 
         <Animated.View style={{ opacity: isCompleted ? pulseAnim : 1 }}>
           <Image 
-            source={require('../../assets/branding/escudo.png')}
+            source={variant === 'challenge' ? require('../../assets/badges/certificacao1.png') : require('../../assets/branding/escudo.png')}
             style={[
-              styles.image,
-              !isUnlocked ? styles.imageLocked : null,
-              isCompleted ? styles.imageCompleted : null,
-              variant === 'challenge' ? { tintColor: '#ff4b4b' } : null
+              variant === 'challenge' ? styles.challengeImage : styles.image,
+              !isUnlocked ? (variant === 'challenge' ? styles.challengeImageLocked : styles.imageLocked) : null,
+              isCompleted ? styles.imageCompleted : null
             ]}
             resizeMode="contain"
           />
@@ -137,14 +120,14 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
 
         {variant === 'challenge' && (
           <View style={styles.challengeIcon}>
-             <Text style={styles.challengeIconText}>⚡</Text>
+             <Text style={styles.challengeIconText}>★</Text>
           </View>
         )}
       </TouchableOpacity>
       <View style={styles.textContainer}>
-        <Text style={titleStyle}>{title}</Text>
+        <Text style={variant === 'challenge' ? [titleStyle, { color: '#00ffff', textTransform: 'uppercase' }] : titleStyle}>{title}</Text>
         {isCompleted && <Text style={styles.completedTag}>// SINCRONIZADO</Text>}
-        {variant === 'challenge' && <Text style={styles.challengeTag}>// FIREWALL_CHALLENGE</Text>}
+        {variant === 'challenge' && <Text style={[styles.challengeTag, { color: '#a0a0a0' }]}>// PHYSICAL_MASTER_TEST</Text>}
       </View>
     </View>
   );
@@ -174,21 +157,13 @@ const styles = StyleSheet.create({
     borderRadius: 40,
   },
   nodeGlowing: {
-    shadowColor: '#00d4ff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 8,
     borderWidth: 1,
     borderColor: '#00d4ff',
   },
   challengeNode: {
-    borderColor: '#ff4b4b',
+    borderColor: '#1a2a6c',
     borderWidth: 2,
-    shadowColor: '#ff4b4b',
-    shadowOpacity: 1,
-    shadowRadius: 15,
-    elevation: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   halo: {
     position: 'absolute',
@@ -203,7 +178,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: '#ff4b4b',
+    backgroundColor: '#1a2a6c',
     zIndex: -1,
   },
   image: {
@@ -211,9 +186,17 @@ const styles = StyleSheet.create({
     height: 65,
     zIndex: 2,
   },
+  challengeImage: {
+    width: 112,
+    height: 112,
+    zIndex: 10,
+  },
   imageLocked: {
     opacity: 0.2,
     tintColor: '#444',
+  },
+  challengeImageLocked: {
+    opacity: 1,
   },
   imageCompleted: {
     opacity: 1,
@@ -234,7 +217,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -10,
     right: -10,
-    backgroundColor: '#ff4b4b',
+    backgroundColor: '#c0c0c0',
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -249,7 +232,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   textContainer: {
-    marginHorizontal: 20,
+    marginHorizontal: 30,
     maxWidth: 150,
     zIndex: 5,
   },
@@ -270,7 +253,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   challengeTag: {
-    color: '#ff4b4b',
+    color: '#c0c0c0',
     fontSize: 8,
     fontFamily: 'RobotoMono_400Regular',
     marginTop: 4,

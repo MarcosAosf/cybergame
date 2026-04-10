@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, StyleSheet, Animated } from 'react-native';
-import { useAudio } from './AudioProvider';
+import { useAudio } from '../hooks/useAudio';
 
 interface TypewriterTextProps {
   text: string;

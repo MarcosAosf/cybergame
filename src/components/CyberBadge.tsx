@@ -67,11 +67,6 @@ export const CyberBadge: React.FC<CyberBadgeProps> = ({ rank, size = 28 }) => {
 
 const styles = StyleSheet.create({
   shadowWrapper: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
-    elevation: 3,
     marginHorizontal: 4,
   },
   fallbackContainer: {

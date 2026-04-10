@@ -52,7 +52,11 @@ export const BlackMarket: React.FC<BlackMarketProps> = ({ visible, onClose }) =>
   }));
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal 
+      visible={Boolean(visible)} 
+      animationType="slide" 
+      transparent={Boolean(true)}
+    >
       <View style={styles.modalBg}>
         <View style={styles.container}>
           <View style={styles.header}>

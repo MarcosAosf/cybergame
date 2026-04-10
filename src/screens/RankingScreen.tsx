@@ -7,29 +7,10 @@ import { UserDossierModal } from '../components/UserDossierModal';
 import { LeagueBrowser } from '../components/LeagueBrowser';
 import { BitWallet } from '../components/BitWallet';
 import { BitsToast } from '../components/BitsToast';
+// import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+// import { db, auth } from '../config/firebase';
 
-// Final 9-Tier Mock Data (Calibrated to True Power Progression Phase 34)
-const generateMockData = () => {
-  const names = [
-    'root_user', 'cyber_ghost', 'glitch_master', 'net_stalker', 'proxy_admin', 
-    'zero_day', 'shodan_crawler', 'pcap_analyst', 'sniff_bot'
-  ];
-  
-  return names.map((name, i) => {
-    // Ensuring mock users stay within their tiered XP zones
-    const xp = 4500 - (i * 500); 
-    return {
-      id: (i + 1).toString(),
-      name,
-      xp,
-      mockLessons: i < 3 ? ['l1', 'l2', 'l5', 'l7', 'l8'] : ['l1', 'l5'],
-    };
-  });
-};
-
-const MOCK_LEADERBOARD = generateMockData();
-
-// Centralized True Power Scale (Phase 34)
+// Cloud Scale (Phase 40: Integrated)
 const getTierFromXP = (xp: number) => {
   if (xp >= 4001) return 9; // Ghost Commander (Roxo10) - God Tier
   if (xp >= 3501) return 8; // Specter Operator (Roxo9)
@@ -64,6 +45,13 @@ const getRoleColor = (tier: number) => {
   return '#555';
 };
 
+const getGlowColor = (tier: number) => {
+  if (tier >= 7) return '#8000ff'; // Purple (Roxo)
+  if (tier >= 5) return '#ff4b4b'; // Red (Vermelho)
+  if (tier >= 3) return '#50c878'; // Emerald (Esmeralda)
+  return '#ff8c00'; // Orange (Laranja)
+};
+
 const getIDColor = (index: number) => {
   if (index === 0) return '#ffd700'; // Gold
   if (index === 1) return '#c0c0c0'; // Silver
@@ -71,57 +59,112 @@ const getIDColor = (index: number) => {
   return '#1a1a1a';
 };
 
-const RankItem = React.memo(({ item, index, onOpenDossier }: any) => {
-  const tier = getTierFromXP(item.xp);
+const ALL_RANKS_JOURNEY = [9, 8, 7, 6, 5, 4, 3, 2, 1];
+const MILESTONES = [0, 501, 1001, 1501, 2001, 2501, 3001, 3501, 4001, 4501];
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+const ProgressionItem = React.memo(({ tier, playerTier, pulseAnim }: any) => {
   const role = getRole(tier);
   const roleColor = getRoleColor(tier);
-  const idColor = getIDColor(index);
-  const displayId = `ID_${(index + 1).toString().padStart(3, '0')}`;
-  
-  // Progress to next XP milestone
-  const milestones = [0, 501, 1001, 1501, 2001, 2501, 3001, 3501, 4001, 4501];
-  const nextMilestone = milestones[Math.min(milestones.length - 1, tier)];
-  const threatLevel = Math.min(0.95, item.xp / (nextMilestone || 4501));
+  const glowColor = getGlowColor(tier);
+  const isCurrent = tier === playerTier;
+  const isLocked = tier > playerTier;
 
   return (
-    <TouchableOpacity 
-      style={item.id === 'player' ? [styles.rankItem, styles.playerItem] : styles.rankItem}
+    <Animated.View style={[
+      styles.rankItem,
+      {
+        borderColor: isLocked ? '#222' : glowColor,
+        borderWidth: isCurrent ? 2 : 1,
+        opacity: isLocked ? 0.5 : 1,
+      },
+      isCurrent ? {
+        backgroundColor: '#1a0033'
+      } : null
+    ]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+         <View style={isLocked ? { opacity: 0.5 } : {}}>
+           <CyberBadge rank={tier} size={40} />
+         </View>
+         <View style={{ marginLeft: 15 }}>
+           <Text style={[styles.rankName, { color: isLocked ? '#555' : roleColor }]}>{role}</Text>
+           {isCurrent && <Text style={{ color: '#fff', fontSize: 10, marginTop: 4, fontFamily: 'RobotoMono_700Bold' }}>// PATENTE ATUAL</Text>}
+           {isLocked && (
+             <Text style={{ color: '#444', fontSize: 9, marginTop: 4, fontFamily: 'RobotoMono_400Regular' }}>
+               // REQUER: {MILESTONES[tier-1]} BYTES
+             </Text>
+           )}
+           {!isCurrent && !isLocked && <Text style={{ color: '#00ff9f', fontSize: 10, marginTop: 4, fontFamily: 'RobotoMono_400Regular' }}>// SINCRONIZADO</Text>}
+         </View>
+      </View>
+    </Animated.View>
+  );
+});
+
+const RankItem = React.memo(({ item, index, onOpenDossier, pulseAnim }: any) => {
+  const xp = item.totalXP || 0;
+  const tier = getTierFromXP(xp);
+  const role = getRole(tier);
+  const roleColor = getRoleColor(tier);
+  const glowColor = getGlowColor(tier);
+  const idColor = getIDColor(index);
+  
+  const nextMilestone = MILESTONES[Math.min(MILESTONES.length - 1, tier)];
+  const threatLevel = Math.min(0.95, xp / (nextMilestone || 4501));
+
+  return (
+    <AnimatedTouchable 
+      style={[
+        styles.rankItem,
+        item.id === 'local_player' ? styles.playerItem : null,
+        {
+          borderColor: glowColor,
+          borderWidth: 1.5,
+        }
+      ]}
       activeOpacity={0.7}
       onPress={() => onOpenDossier(item, role, tier)}
     >
-      <Text style={[styles.rankIndex, { color: idColor }]}>{displayId}</Text>
-      
-      <View style={styles.rankInfo}>
-        <View style={styles.nameRow}>
-          <Text style={styles.rankName}>{item.name}</Text>
-          <View style={styles.badgeContainer}>
-             <CyberBadge rank={tier} size={24} />
+      <View style={styles.leftGroup}>
+        <Text style={[styles.positionText, { color: idColor }]}>#{index + 1}</Text>
+        <View style={styles.rankInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.rankName}>{item.name}</Text>
+            <View style={styles.badgeContainer}>
+               <CyberBadge rank={tier} size={24} />
+            </View>
           </View>
-        </View>
-        
-        <Text style={[styles.roleText, { color: roleColor }]}>{role}</Text>
-        
-        <View style={styles.threatContainer}>
-           <View style={[styles.threatFill, { width: `${threatLevel * 100}%`, backgroundColor: roleColor }]} />
+          
+          <Text style={[styles.roleText, { color: roleColor }]}>{role}</Text>
+          
+          <View style={styles.threatContainer}>
+             <View style={[styles.threatFill, { width: `${threatLevel * 100}%`, backgroundColor: roleColor }]} />
+          </View>
         </View>
       </View>
 
       <View style={styles.xpContainer}>
-        <Text style={styles.rankXP}>{item.xp}</Text>
-        <Text style={styles.xpBox}>BITS</Text>
+        <Text style={styles.rankXP}>{xp}</Text>
+        <Text style={styles.xpBox}>BYTES</Text>
+        {item.bits !== undefined && (
+           <Text style={styles.bitsSecondary}>₿ {item.bits}</Text>
+        )}
       </View>
-    </TouchableOpacity>
+    </AnimatedTouchable>
   );
 });
 
 export const RankingScreen = () => {
-  const { user, completedLessonIds, isOnFire, emergencyTasksCompleted } = useSecStore();
+  const { user, stats, emergencyTasksCompleted } = useSecStore();
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
   
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [dossierVisible, setDossierVisible] = useState(false);
   const [leagueBrowserVisible, setLeagueBrowserVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'my_ranking' | 'top_10'>('my_ranking');
 
-  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Animated.loop(
@@ -130,36 +173,43 @@ export const RankingScreen = () => {
         Animated.timing(pulseAnim, { toValue: 0.4, duration: 1500, useNativeDriver: true }),
       ])
     ).start();
+
+    // LOCAL_MODE: Leaderboard initialized with local operator data only
+    setLeaderboard([{ id: 'local_player', name: user.name, totalXP: user.totalXP, bits: stats.bits }]);
+    setLoading(false);
+  }, [user.totalXP, stats.bits]);
+
+  const playerPosition = useMemo(() => {
+    return 1; // [LOCAL_MODE]: Operator is always #1 in local grid
   }, []);
 
-  const memoizedLeaderboard = useMemo(() => {
-    const playerObj = { 
-      id: 'player', 
-      name: user.name, 
-      xp: user.totalXP, 
-      mockLessons: completedLessonIds,
-      isPlayer: true 
-    };
-    return [...MOCK_LEADERBOARD, playerObj].sort((a, b) => b.xp - a.xp);
-  }, [user.totalXP, user.name, completedLessonIds]);
-
   const playerTier = useMemo(() => getTierFromXP(user.totalXP), [user.totalXP]);
-  const playerPosition = useMemo(() => {
-    const p = memoizedLeaderboard.findIndex(item => item.id === 'player') + 1;
-    return p > 0 ? p : 9;
-  }, [memoizedLeaderboard]);
-
   const playerRole = getRole(playerTier);
   const playerRoleColor = getRoleColor(playerTier);
+  const playerGlowColor = getGlowColor(playerTier);
+
+  const tabAnim = useRef(new Animated.Value(0)).current;
+
+  const handleTabSwitch = (tab: 'my_ranking' | 'top_10') => {
+    setActiveTab(tab);
+    Animated.spring(tabAnim, {
+      toValue: tab === 'my_ranking' ? 0 : 1,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 50,
+    }).start();
+  };
+
+  const displayedList = leaderboard.slice(0, 10);
 
   const handleOpenDossier = (item: any, role: string, tier: number) => {
-    // If this is the player's own dossier, pass their emergency count for Medal of Valor
-    const isPlayer = item.id === 'player';
+    const isPlayer = item.id === 'local_player';
     setSelectedUser({
       ...item,
+      xp: item.totalXP,
       role,
       rank: tier,
-      emergencyTasksCompleted: isPlayer ? emergencyTasksCompleted : 0,
+      emergencyTasksCompleted: isPlayer ? emergencyTasksCompleted : (item.emergencyTasksCompleted || 0),
     });
     setDossierVisible(true);
   };
@@ -167,7 +217,9 @@ export const RankingScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <BitsToast />
-      <View style={styles.header}>
+      <Animated.View style={[styles.headerCard, {
+        borderColor: playerGlowColor,
+      }]}>
         <View style={styles.dynamicHeader}>
            <View style={[styles.headerIconBox, { borderColor: playerTier >= 7 ? playerRoleColor : '#222' }]}>
              <CyberBadge rank={playerTier} size={70} />
@@ -195,39 +247,84 @@ export const RankingScreen = () => {
              </Animated.View>
 
              <View style={styles.headerStats}>
-                <Text style={styles.statLabel}>ACCESS_BITS: <Text style={styles.statVal}>{user.totalXP}</Text></Text>
+                <Text style={styles.statLabel}>TOTAL_BYTES: <Text style={styles.statVal}>{user.totalXP}</Text></Text>
                 <Text style={styles.statLabel}>GRID_POS: <Text style={styles.statVal}>{playerPosition}</Text></Text>
              </View>
            </View>
         </View>
+      </Animated.View>
+
+      <View style={styles.tabsWrapper}>
+        <Animated.View style={[
+          styles.tabIndicator,
+          {
+            left: tabAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['0%', '50%']
+            })
+          }
+        ]} />
+        <TouchableOpacity 
+          style={styles.tab}
+          onPress={() => handleTabSwitch('my_ranking')}
+        >
+          <Text style={[styles.tabLabel, activeTab === 'my_ranking' ? styles.activeTabLabel : null]}>MEU RANKING</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.tab}
+          onPress={() => handleTabSwitch('top_10')}
+        >
+          <Text style={[styles.tabLabel, activeTab === 'top_10' ? styles.activeTabLabel : null]}>TOP 10 GLOBAL</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.listContainer}>
-        <Text style={styles.listHeader}>// RANKING_TRUE_POWER_V3.4</Text>
-        <FlatList
-          data={memoizedLeaderboard}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item, index }) => (
-            <RankItem 
-              item={item} 
-              index={index} 
-              onOpenDossier={handleOpenDossier}
-            />
-          )}
-        />
+        {activeTab === 'my_ranking' ? (
+           <>
+             <Text style={styles.listHeader}>// PROGRESSION_SCALE_V3.8</Text>
+             <FlatList
+               data={ALL_RANKS_JOURNEY}
+               keyExtractor={(item) => item.toString()}
+               showsVerticalScrollIndicator={false}
+               renderItem={({ item }) => (
+                 <ProgressionItem 
+                   tier={item} 
+                   playerTier={playerTier}
+                   pulseAnim={pulseAnim}
+                 />
+               )}
+             />
+           </>
+        ) : (
+           <>
+             <Text style={styles.listHeader}>// RANKING_TRUE_POWER_GLOBAL</Text>
+             <FlatList
+               data={displayedList}
+               keyExtractor={(item) => item.id}
+               showsVerticalScrollIndicator={false}
+               renderItem={({ item, index }) => (
+                 <RankItem 
+                   item={item} 
+                   index={index} 
+                   onOpenDossier={handleOpenDossier}
+                   pulseAnim={pulseAnim}
+                 />
+               )}
+             />
+           </>
+        )}
       </View>
 
       {selectedUser && (
         <UserDossierModal 
-          visible={dossierVisible}
+          visible={Boolean(dossierVisible)}
           onClose={() => setDossierVisible(false)}
           operator={selectedUser}
         />
       )}
 
       <LeagueBrowser 
-        visible={leagueBrowserVisible}
+        visible={Boolean(leagueBrowserVisible)}
         onClose={() => setLeagueBrowserVisible(false)}
       />
     </SafeAreaView>
@@ -239,11 +336,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  header: {
+  headerCard: {
     padding: 20,
     backgroundColor: '#050505',
-    borderBottomWidth: 1,
-    borderBottomColor: '#111',
+    marginHorizontal: 20,
+    marginTop: 15,
+    borderRadius: 15,
+    borderWidth: 1,
   },
   dynamicHeader: {
     flexDirection: 'row',
@@ -324,6 +423,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
   },
+  tabsWrapper: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 8,
+    backgroundColor: '#0a0a0a',
+    position: 'relative',
+    height: 42,
+  },
+  tabIndicator: {
+    position: 'absolute',
+    width: '50%',
+    height: '100%',
+    backgroundColor: '#111',
+    borderBottomWidth: 2,
+    borderBottomColor: '#00d4ff',
+    borderRadius: 8,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  tabLabel: {
+    fontFamily: 'RobotoMono_700Bold',
+    fontSize: 10,
+    color: '#555',
+  },
+  activeTabLabel: {
+    color: '#00d4ff',
+  },
   listHeader: {
     color: '#00ff9f',
     fontFamily: 'RobotoMono_400Regular',
@@ -334,25 +466,28 @@ const styles = StyleSheet.create({
   rankItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 15,
     backgroundColor: '#050505',
     borderRadius: 12,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#0a0a0a',
   },
   playerItem: {
-    borderColor: '#bf00ff30',
-    backgroundColor: '#050005',
+    backgroundColor: '#1a0033',
   },
-  rankIndex: {
-    width: 55,
+  leftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  positionText: {
     fontFamily: 'RobotoMono_700Bold',
-    fontSize: 10,
+    fontSize: 14,
+    marginRight: 10,
+    width: 30,
   },
   rankInfo: {
     flex: 1,
-    paddingLeft: 10,
   },
   nameRow: {
     flexDirection: 'row',
@@ -386,7 +521,8 @@ const styles = StyleSheet.create({
   },
   xpContainer: {
     alignItems: 'flex-end',
-    width: 70,
+    width: 80,
+    paddingRight: 20,
   },
   rankXP: {
     color: '#fff',
@@ -397,5 +533,11 @@ const styles = StyleSheet.create({
     color: '#00d4ff',
     fontSize: 7,
     fontFamily: 'RobotoMono_400Regular',
+  },
+  bitsSecondary: {
+    color: '#00ff9f',
+    fontSize: 8,
+    fontFamily: 'RobotoMono_400Regular',
+    marginTop: 4,
   },
 });

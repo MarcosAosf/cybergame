@@ -40,7 +40,11 @@ export const UserDossierModal: React.FC<UserDossierProps> = ({ visible, onClose,
   const badgeSource = getBadgeSource(operator.rank);
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true}>
+    <Modal 
+      visible={Boolean(visible)} 
+      animationType="fade" 
+      transparent={Boolean(true)}
+    >
       <View style={styles.modalBg}>
         <View style={styles.container}>
           <View style={styles.header}>
@@ -170,11 +174,6 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   badgeWrapper: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
-    elevation: 8,
   },
   shield: {
     width: 80,

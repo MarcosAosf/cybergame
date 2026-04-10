@@ -5,23 +5,27 @@ import { useSecStore } from '../store/useSecStore';
 import { MODULES, Lesson } from '../data/lessons';
 import { RoadNode } from '../components/RoadNode';
 import { LessonModal } from '../components/LessonModal';
-import { useAudio } from '../components/AudioProvider';
+import { useAudio } from '../hooks/useAudio';
 import { BitWallet } from '../components/BitWallet';
 import { BitsToast } from '../components/BitsToast';
+import { Ionicons } from '@expo/vector-icons';
 import { EmergencyNode, EmergencyAlert, EmergencyModal } from '../components/EmergencyProtocol';
 
 export const RoadScreen = () => {
-  const { completedLessonIds, stats, isGraduated, loseHeart, completeEmergencyTask, isOnFire } = useSecStore();
+  const { user, completedLessonIds, stats, isGraduated, loseHeart, completeEmergencyTask, isOnFire } = useSecStore();
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [tapCount, setTapCount] = useState(0);
   const { playEffect } = useAudio();
 
-  // Emergency Protocol State — single skull node, 30% random spawn
+  // Emergency Protocol State — single skull node, 60% spawn rate
   const [emergencyModalVisible, setEmergencyModalVisible] = useState(false);
-  const [showEmergencyNode] = useState(() => Math.random() < 0.30);
+  const [showEmergencyNode] = useState(() => Math.random() < 0.60);
 
   // Terminal Breach Pulse Animation
   const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  const activeModuleTitle = MODULES.find(m => m.lessons.some(l => !completedLessonIds.includes(l.id)))?.title || MODULES[MODULES.length - 1].title;
+
 
   useEffect(() => {
     if (completedLessonIds.length > 0) {
@@ -55,17 +59,39 @@ export const RoadScreen = () => {
       <BitsToast />
       <TouchableOpacity activeOpacity={1} onPress={handleEasterEgg}>
         <View style={styles.header}>
-          <Text style={{ color: "#00d4ff", fontSize: 20 }}>◈</Text>
-          <Text style={styles.headerTitle}>SECROAD_MAP</Text>
-          <View style={styles.heartContainer}>
-            {/* Show emergency alert badge when an active emergency is available */}
-            {showEmergencyNode && !emergencyModalVisible && (
-              <EmergencyAlert onTap={() => setEmergencyModalVisible(true)} />
-            )}
-            <Text style={styles.hearts}>❤️ {stats.hearts}</Text>
-            <Text style={styles.credits}>⚡ {stats.credits}</Text>
-            <BitWallet />
+          {/* Main header: Title section */}
+          <View style={styles.titleSection}>
+            <Text style={{ color: "#00d4ff", fontSize: 20 }}>◈</Text>
+            <View style={{ flex: 1, marginLeft: 10, flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text style={styles.headerTitle}>SECROAD_MAP</Text>
+              <Text style={styles.activeLayerText}> // DEFENDENDO: {activeModuleTitle.toUpperCase()}</Text>
+            </View>
           </View>
+
+          {/* Stats Bar sub-row */}
+          <View style={styles.statsBar}>
+            <View style={styles.statGroup}>
+              <Ionicons name="heart" size={16} color="#ff4b4b" />
+              <Text style={styles.statValueText}>{stats.hearts}</Text>
+            </View>
+            <View style={styles.statGroup}>
+              <Ionicons name="flash" size={16} color="#00d4ff" />
+              <Text style={styles.statValueText}>{stats.credits}</Text>
+            </View>
+            <View style={styles.statGroup}>
+              <Text style={[styles.statValueText, { color: '#00d4ff' }]}>⚡ {user.totalXP}B</Text>
+            </View>
+            <View style={styles.statGroup}>
+              <Text style={[styles.statValueText, { color: '#00ff9f' }]}>฿ {stats.bits}</Text>
+            </View>
+          </View>
+
+          {/* Emergency alert sub-row — only visible when breach is active */}
+          {!!showEmergencyNode && !emergencyModalVisible && (
+            <View style={styles.headerAlertRow}>
+              <EmergencyAlert onTap={() => setEmergencyModalVisible(true)} />
+            </View>
+          )}
         </View>
       </TouchableOpacity>
       
@@ -96,12 +122,13 @@ export const RoadScreen = () => {
               return (
                 <RoadNode
                   key={lesson.id}
-                  id={lesson.id}
-                  title={lesson.title}
-                  index={lIndex}
+                  lesson={lesson}
                   isUnlocked={isUnlocked}
                   isCompleted={isCompleted}
                   onPress={() => setSelectedLesson(lesson)}
+                  isChallenge={lesson.isChallenge}
+                  // Blue for Camada 1, Emerald Green for Camada 2
+                  color={mIndex === 1 ? '#00ff9f' : '#00d4ff'}
                 />
               );
             })}
@@ -109,14 +136,14 @@ export const RoadScreen = () => {
         ))}
 
         {/* SYSTEM_BREACH NODE — single skull, exclusive emergency trigger */}
-        {showEmergencyNode && (
-          <EmergencyNode onActivate={() => { playEffect('sync'); setEmergencyModalVisible(true); }} />
+        {!!showEmergencyNode && (
+          <EmergencyNode onActivate={() => { setEmergencyModalVisible(true); }} />
         )}
       </ScrollView>
 
       {/* EMERGENCY PROTOCOL MODAL */}
       <EmergencyModal
-        visible={emergencyModalVisible}
+        visible={Boolean(emergencyModalVisible)}
         onSuccess={() => {
           setEmergencyModalVisible(false);
           completeEmergencyTask();
@@ -151,12 +178,21 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   header: {
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
+    flexDirection: 'column',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
     backgroundColor: '#000000',
+  },
+  headerMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAlertRow: {
+    marginTop: 8,
+    alignItems: 'flex-start',
   },
   gradBanner: {
     backgroundColor: 'rgba(0, 255, 159, 0.1)',
@@ -171,20 +207,40 @@ const styles = StyleSheet.create({
     fontFamily: 'RobotoMono_700Bold',
     letterSpacing: 1,
   },
+  titleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#111',
+  },
+  statGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValueText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'RobotoMono_700Bold',
+  },
   headerTitle: {
     color: '#00d4ff',
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'RobotoMono_700Bold',
-    marginLeft: 10,
-    flex: 1,
   },
-  heartContainer: {
-    flexDirection: 'row',
-    gap: 15,
-  },
-  hearts: {
-    color: '#ff4b4b',
-    fontWeight: 'bold',
+  activeLayerText: {
+    color: '#00ff9f',
+    fontSize: 8,
+    fontFamily: 'RobotoMono_400Regular',
+    marginLeft: 6,
+    letterSpacing: 1,
   },
   scrollContent: {
     paddingBottom: 150,

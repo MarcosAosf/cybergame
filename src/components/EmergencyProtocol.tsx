@@ -64,7 +64,7 @@ export const EmergencyAlert: React.FC<{ onTap: () => void }> = ({ onTap }) => {
     <TouchableOpacity onPress={onTap} activeOpacity={0.8}>
       <Animated.View style={[styles.alertBadge, { opacity: blinkAnim }]}>
         <Image source={require('../../assets/badges/emergencia.png')} style={styles.alertIcon} resizeMode="contain" />
-        <Text style={styles.alertText}>!! SYSTEM_BREACH_DETECTED !!</Text>
+        <Text style={styles.alertText} numberOfLines={1}>!! BREACH_DETECTED: +450 BITS</Text>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -134,7 +134,11 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ visible, onSucce
   const q = EMERGENCY_QUESTIONS[qIdx];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false}>
+    <Modal 
+      visible={Boolean(visible)} 
+      animationType="slide" 
+      transparent={Boolean(false)}
+    >
       <View style={styles.modalBg}>
         <View style={styles.modalHeader}>
           <Image source={require('../../assets/badges/emergencia.png')} style={styles.modalSkull} resizeMode="contain" />
@@ -225,27 +229,30 @@ const styles = StyleSheet.create({
     marginTop: 3,
     opacity: 0.8,
   },
-  // Alert banner
   alertBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,34,34,0.1)',
+    backgroundColor: 'rgba(255,34,34,0.12)',
     borderWidth: 1,
     borderColor: '#ff2222',
     borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     gap: 6,
+    alignSelf: 'flex-start',
+    flexShrink: 1,
   },
   alertIcon: {
-    width: 16,
-    height: 16,
+    width: 14,
+    height: 14,
+    flexShrink: 0,
   },
   alertText: {
     color: '#ff2222',
     fontFamily: 'RobotoMono_700Bold',
     fontSize: 9,
     letterSpacing: 0.5,
+    flexShrink: 1,
   },
   // Modal
   modalBg: {

@@ -20,7 +20,11 @@ const NONA_HIERARCHY = [
 
 export const LeagueBrowser: React.FC<LeagueBrowserProps> = ({ visible, onClose }) => {
   return (
-    <Modal visible={visible} animationType="slide" transparent={true}>
+    <Modal 
+      visible={Boolean(visible)} 
+      animationType="slide" 
+      transparent={true}
+    >
       <View style={styles.modalBg}>
         <View style={styles.container}>
           <View style={styles.header}>

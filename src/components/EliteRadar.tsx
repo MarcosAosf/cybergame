@@ -79,7 +79,7 @@ export const EliteRadar: React.FC<EliteRadarProps> = ({ completedLessonIds }) =>
         })}
       </Svg>
       
-      <View style={styles.labelsContainer}>
+      <View style={styles.labelsContainer} pointerEvents="none">
         {stats.map((stat, i) => (
           <Text key={i} style={[styles.labelText, styles[`label${i}`]]}>
             {stat.label}
@@ -103,7 +103,6 @@ const styles = StyleSheet.create({
   },
   labelsContainer: {
     ...StyleSheet.absoluteFillObject,
-    pointerEvents: 'none',
   },
   labelText: {
     position: 'absolute',

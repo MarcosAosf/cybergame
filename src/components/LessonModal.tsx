@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { Lesson } from '../data/lessons';
+import { Lesson, QuestionItem } from '../data/lessons';
 import { useSecStore } from '../store/useSecStore';
 import { TypewriterText } from './TypewriterText';
+import { ErrorModal } from './ErrorModal';
 
 interface LessonModalProps {
   lesson: Lesson;
@@ -26,39 +27,65 @@ type ViewMode = 'selection' | 'theory' | 'challenge';
 
 export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('selection');
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  
   const [userInput, setUserInput] = useState('');
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [expandedHint, setExpandedHint] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [didUseHints, setDidUseHints] = useState(false);
   const [hintCount, setHintCount] = useState(0);
   
   const { completeLesson, loseHeart, useCredit, stats } = useSecStore();
 
-  // Typewriter logic moved to dedicated component
+  const currentQuestion = lesson.questions[currentQuestionIndex];
+
+  useEffect(() => {
+    // Reset state when question changes
+    setUserInput('');
+    setSelectedOption(null);
+    setExpandedHint(null);
+    setShowHint(false);
+  }, [currentQuestionIndex]);
 
   const handleSubmit = () => {
     let correct = false;
-    if (lesson.type === 'multiple-choice') {
-      correct = selectedOption === lesson.answer;
+    if (currentQuestion.type === 'multiple-choice') {
+      correct = selectedOption === currentQuestion.answer;
     } else {
-      correct = userInput.trim().toLowerCase() === lesson.answer.toLowerCase();
+      correct = userInput.trim().toLowerCase() === currentQuestion.answer.toLowerCase();
     }
 
     if (correct) {
-      setIsSuccess(true);
-      setIsFinished(true);
-      completeLesson(lesson.id, 50, 10, didUseHints); 
+      if (currentQuestionIndex < lesson.questions.length - 1) {
+         setCurrentQuestionIndex(currentQuestionIndex + 1);
+      } else {
+         setIsSuccess(true);
+         setIsFinished(true);
+         // Scaling bits & xp based on questions count.
+         const xpGain = lesson.questions.length * 10;
+         const bitsGain = lesson.isChallenge ? 300 : lesson.questions.length * 10;
+         completeLesson(lesson.id, xpGain, bitsGain, didUseHints, lesson.isChallenge, !didUseHints); 
+      }
     } else {
       loseHeart();
       setShowHint(true);
-      if (stats.hearts <= 1) {
-        Alert.alert("ERRO CRÍTICO", "Corações esgotados! Sincronize com o terminal para reiniciar.");
-        onClose();
-      }
+      setShowErrorModal(true);
     }
+  };
+
+  const handleRetryError = () => {
+    setUserInput('');
+    setSelectedOption(null);
+    setShowErrorModal(false);
+  };
+
+  const handleAbortError = () => {
+    setShowErrorModal(false);
+    onClose();
   };
 
   const toggleOptionHint = (option: string) => {
@@ -118,7 +145,7 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
         <View style={styles.theoryBox}>
           <TypewriterText 
             text={lesson.theory} 
-            speed={25} 
+            speed={20} 
             style={styles.theoryText} 
           />
         </View>
@@ -129,7 +156,7 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
           onPress={() => setViewMode('challenge')}
           activeOpacity={0.7}
         >
-          <Text style={styles.submitButtonText}>IR PARA O DESAFIO</Text>
+          <Text style={styles.submitButtonText}>IR PARA OS DESAFIOS</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -137,43 +164,50 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
 
   const renderChallenge = () => (
     <View style={styles.challengeWrapper}>
+      <View style={styles.questionProgress}>
+         <Text style={styles.questionProgressText}>
+            NODO {currentQuestionIndex + 1} / {lesson.questions.length}
+         </Text>
+      </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.questionType}>
-          {lesson.type === 'multiple-choice' ? '// VALIDAÇÃO_DE_CONCEITO' : '// ENTRADA_DE_COMANDO'}
+          {currentQuestion.type === 'multiple-choice' ? '// VALIDAÇÃO_DE_CONCEITO' : '// ENTRADA_DE_COMANDO'}
         </Text>
-        <Text style={styles.questionText}>{lesson.question}</Text>
+        <Text style={styles.questionText}>{currentQuestion.question}</Text>
 
-        {lesson.type === 'multiple-choice' ? (
+        {currentQuestion.type === 'multiple-choice' ? (
           <View style={styles.optionsContainer}>
-            {lesson.options?.map((option) => (
+            {currentQuestion.options?.map((option) => (
               <View key={option} style={styles.optionWrapper}>
-                <View style={styles.optionRow}>
+                <View style={selectedOption === option ? [styles.optionRow, styles.optionRowSelected] : styles.optionRow}>
                   <TouchableOpacity
-                    style={selectedOption === option ? { ...styles.option, ...styles.optionSelected } : styles.option}
+                    style={styles.optionTouchable}
                     onPress={() => setSelectedOption(option)}
                     activeOpacity={0.7}
                   >
-                    <Text style={selectedOption === option ? { ...styles.optionText, ...styles.optionTextSelected } : styles.optionText}>{option}</Text>
+                    <Text style={selectedOption === option ? [styles.optionText, styles.optionTextSelected] : styles.optionText}>
+                      {option}
+                    </Text>
                   </TouchableOpacity>
                   
-                  {lesson.optionHints && lesson.optionHints[option] && (
-                    <TouchableOpacity 
-                      onPress={() => toggleOptionHint(option)}
-                      style={styles.infoIndicator}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons 
-                        name="information-circle" 
-                        size={18} 
-                        color={expandedHint === option ? '#00d4ff' : '#555555'} 
-                      />
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity 
+                    onPress={() => toggleOptionHint(option)}
+                    style={styles.infoIndicator}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons 
+                      name="information-circle" 
+                      size={18} 
+                      color={expandedHint === option ? '#00d4ff' : '#555555'} 
+                    />
+                  </TouchableOpacity>
                 </View>
                 
                 {expandedHint === option && (
                   <View style={styles.optionHintBox}>
-                    <Text style={styles.optionHintText}>{lesson.optionHints?.[option]}</Text>
+                    <Text style={styles.optionHintText}>
+                      {currentQuestion.optionHints?.[option] || "Sem informações adicionais explícitas para esta alternativa."}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -189,8 +223,11 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
               placeholder="Digite o comando..."
               placeholderTextColor="#a0a0a0"
               autoCapitalize="none"
-              autoCorrect={false}
-              autoFocus={true}
+              autoCorrect={Boolean(false)}
+              autoFocus={Boolean(true)}
+              spellCheck={Boolean(false)}
+              multiline={Boolean(false)}
+              editable={Boolean(true)}
             />
           </View>
         )}
@@ -201,7 +238,7 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
               <Text style={{ color: "#00d4ff", fontSize: 16 }}>i </Text>
               <Text style={styles.hintTitle}>DICA_DE_SEGURANÇA</Text>
             </View>
-            <Text style={styles.hintText}>{lesson.hint}</Text>
+            <Text style={styles.hintText}>{currentQuestion.hint}</Text>
           </View>
         ) : null}
       </ScrollView>
@@ -210,12 +247,12 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
         {!isFinished ? (
           <TouchableOpacity 
             style={
-              (lesson.type === 'multiple-choice' ? !selectedOption : !userInput) 
+              (currentQuestion.type === 'multiple-choice' ? !selectedOption : !userInput) 
                 ? { ...styles.submitButton, ...styles.submitButtonDisabled } 
                 : styles.submitButton
             } 
             onPress={handleSubmit}
-            disabled={lesson.type === 'multiple-choice' ? !selectedOption : !userInput}
+            disabled={currentQuestion.type === 'multiple-choice' ? !selectedOption : !userInput}
             activeOpacity={0.7}
           >
             <Text style={styles.submitButtonText}>EXECUTAR</Text>
@@ -230,11 +267,20 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
           </TouchableOpacity>
         )}
       </View>
+      <ErrorModal 
+        visible={Boolean(showErrorModal)} 
+        onRetry={handleRetryError} 
+        onAbort={handleAbortError} 
+      />
     </View>
   );
 
   return (
-    <Modal animationType="slide" transparent={false} visible={true}>
+    <Modal 
+      animationType="slide" 
+      transparent={Boolean(false)} 
+      visible={Boolean(true)}
+    >
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
@@ -244,10 +290,11 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
             <Text style={{ color: "#a0a0a0", fontSize: 24 }}>X</Text>
           </TouchableOpacity>
           <View style={styles.progressBar}>
-            <View style={{ ...styles.progressFill, width: '50%' }} />
+            <View style={{ ...styles.progressFill, width: `${Math.max(10, ((currentQuestionIndex) / lesson.questions.length) * 100)}%` }} />
           </View>
           <View style={styles.headerStats}>
-            <Text style={styles.hearts}>❤️ {stats.hearts}</Text>
+            <Ionicons name="heart" size={18} color="#ff4b4b" />
+            <Text style={styles.hearts}>{stats.hearts}</Text>
             <Text style={styles.creditsHeader}>⚡ {stats.credits}</Text>
           </View>
         </View>
@@ -260,7 +307,7 @@ export const LessonModal: React.FC<LessonModalProps> = ({ lesson, onClose }) => 
           <View style={styles.successOverlay}>
              <Text style={{ color: "#00ff9f", fontSize: 64 }}>✔</Text>
              <Text style={styles.successText}>SISTEMA INVADIDO</Text>
-             <Text style={styles.xpGain}>+50 XP | +10 BITS</Text>
+             <Text style={styles.xpGain}>+{lesson.questions.length * 10} BYTES | +{lesson.isChallenge ? 300 : lesson.questions.length * 10} BITS</Text>
              
              <TouchableOpacity 
                style={styles.successContinueButton} 
@@ -303,8 +350,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#00d4ff',
   },
   hearts: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#ff4b4b',
+    marginLeft: -4,
   },
   creditsHeader: {
     color: '#00d4ff',
@@ -370,6 +419,16 @@ const styles = StyleSheet.create({
   challengeWrapper: {
     flex: 1,
   },
+  questionProgress: {
+    paddingHorizontal: 25,
+    paddingTop: 10,
+  },
+  questionProgressText: {
+    color: '#888',
+    fontFamily: 'RobotoMono_700Bold',
+    fontSize: 12,
+    letterSpacing: 2,
+  },
   questionType: {
     color: '#00d4ff',
     fontFamily: 'RobotoMono_400Regular',
@@ -392,23 +451,29 @@ const styles = StyleSheet.create({
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  option: {
-    flex: 1,
+    justifyContent: 'space-between',
+    minHeight: 65,
+    width: '100%',
     backgroundColor: '#111',
     borderWidth: 1,
     borderColor: '#333',
-    padding: 18,
     borderRadius: 12,
+    paddingHorizontal: 15,
   },
-  optionSelected: {
+  optionRowSelected: {
     borderColor: '#00d4ff',
     backgroundColor: 'rgba(0, 212, 255, 0.1)',
   },
+  optionTouchable: {
+    flex: 1,
+    paddingVertical: 18,
+    marginRight: 10,
+    justifyContent: 'center',
+  },
   optionText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
+    flexShrink: 1,
   },
   optionTextSelected: {
     color: '#00d4ff',

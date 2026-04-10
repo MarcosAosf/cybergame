@@ -4,26 +4,33 @@ import { useSecStore } from '../store/useSecStore';
 
 export const BitWallet = () => {
   const bits = useSecStore(state => state.stats.bits);
+  const bytes = useSecStore(state => state.user.totalXP);
+  
   return (
-    <View style={styles.wallet}>
-      <Text style={styles.walletText}>[ ₿ {bits.toLocaleString()} BITS ]</Text>
+    <View style={styles.container}>
+      <View style={styles.statBox}>
+        <Text style={[styles.statText, { color: '#00d4ff' }]}>⚡ {bytes}B</Text>
+      </View>
+      <View style={styles.statBox}>
+        <Text style={styles.statText}>฿ {bits}</Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  wallet: {
-    backgroundColor: 'rgba(0, 255, 159, 0.05)',
-    borderWidth: 1,
-    borderColor: '#00ff9f22',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+  container: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  walletText: {
+  statBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statText: {
     color: '#00ff9f',
     fontFamily: 'RobotoMono_700Bold',
-    fontSize: 11,
-    letterSpacing: 1,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
 });
