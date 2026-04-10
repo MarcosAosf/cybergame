@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { EmergencyNode, EmergencyAlert, EmergencyModal } from '../components/EmergencyProtocol';
 
 export const RoadScreen = () => {
-  const { user, completedLessonIds, stats, isGraduated, loseHeart, completeEmergencyTask, isOnFire } = useSecStore();
+  const { user, completedLessonIds, stats, isGraduated, loseHeart, completeEmergencyTask, isOnFire, isCloudSyncActive } = useSecStore();
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [tapCount, setTapCount] = useState(0);
   const { playEffect } = useAudio();
@@ -62,9 +62,14 @@ export const RoadScreen = () => {
           {/* Main header: Title section */}
           <View style={styles.titleSection}>
             <Text style={{ color: "#00d4ff", fontSize: 20 }}>◈</Text>
-            <View style={{ flex: 1, marginLeft: 10, flexDirection: 'row', alignItems: 'baseline' }}>
+            <View style={{ flex: 1, marginLeft: 10, flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' }}>
               <Text style={styles.headerTitle}>SECROAD_MAP</Text>
               <Text style={styles.activeLayerText}> // DEFENDENDO: {activeModuleTitle.toUpperCase()}</Text>
+              {!isCloudSyncActive && (
+                <Text style={[styles.activeLayerText, { color: '#ff4b4b', marginLeft: 10 }]}>
+                  // STATUS: LOCAL_ARCHIVE
+                </Text>
+              )}
             </View>
           </View>
 

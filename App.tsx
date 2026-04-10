@@ -57,17 +57,22 @@ export default function App() {
     // --- FIREBASE_AUTH_BRIDGE: THE BOOLEAN SHIELD ---
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // [SHIELD]: Strict primitive serialization only
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
         });
 
-        // --- CLOUD_HANDSHAKE: Load Global Dossier ---
+        // --- CLOUD_HANDSHAKE: Load Global Dossier (Non-blocking) ---
+        // We use a Promise.race to ensure we don't hang the app if Firestore is slow/offline
+        const syncTimeout = new Promise(resolve => setTimeout(resolve, 3000));
+        
         try {
-          await useSecStore.getState().loadUserData(firebaseUser.uid);
+          await Promise.race([
+            useSecStore.getState().loadUserData(firebaseUser.uid),
+            syncTimeout
+          ]);
         } catch (e) {
-          console.warn('// SYNC_LATENCY_DETECTED');
+          console.warn('// SYNC_TIMEOUT: Using Local Archive');
         }
 
         setAuthResolved(true);

@@ -28,14 +28,20 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
   const haloAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Reset any ongoing animations
+    pulseAnim.stopAnimation();
+    pulseAnim.setValue(1);
+    haloAnim.stopAnimation();
+    haloAnim.setValue(0);
+
     // Pulse if completed OR if it's an unlocked challenge (next goal)
     const shouldPulse = isCompleted || (variant === 'challenge' && isUnlocked);
 
     if (shouldPulse) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 0.8, duration: 1500, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true })
+          Animated.timing(pulseAnim, { toValue: 1.08, duration: 1000, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
         ])
       ).start();
 
@@ -47,9 +53,6 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
           ])
         ).start();
       }
-    } else {
-      pulseAnim.setValue(1);
-      haloAnim.setValue(0);
     }
   }, [isCompleted, isUnlocked, variant]);
 
@@ -107,7 +110,12 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
           <View style={[styles.challengeHalo, { opacity: 0.4 }]} />
         )}
 
-        <Animated.View style={{ opacity: (isCompleted || (variant === 'challenge' && isUnlocked)) ? pulseAnim : 1 }}>
+        <Animated.View 
+          style={{ 
+            transform: [{ scale: (isCompleted || (variant === 'challenge' && isUnlocked)) ? pulseAnim : 1 }],
+            opacity: isCompleted || (variant === 'challenge' && isUnlocked) ? 1 : 0.8
+          }}
+        >
           <Image
             source={variant === 'challenge' ? require('../../assets/badges/certificacao1.png') : require('../../assets/branding/escudo.png')}
             style={[

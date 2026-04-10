@@ -128,6 +128,7 @@ export const useSecStore = create<SecState>()(
       market: buildInitialMarket(),
       lastBitsEarned: null,
       _hasHydrated: false,
+      isCloudSyncActive: false,
 
       setHasHydrated: (state) => set({ _hasHydrated: state }),
 
@@ -147,9 +148,11 @@ export const useSecStore = create<SecState>()(
             completedNodes: completedLessonIds,
             lastSyncAt: new Date().toISOString()
           });
+          set({ isCloudSyncActive: true });
           console.log('--- [IDENTITY_SYNC]: Cloud Dossier Updated ---');
         } catch (error) {
-          console.warn('--- [IDENTITY_SYNC_ERROR]: Failed to reach cloud ---', error);
+          set({ isCloudSyncActive: false });
+          console.warn('--- [IDENTITY_SYNC_OFFLINE]: Local Archive Only ---');
         }
       },
 
@@ -172,11 +175,13 @@ export const useSecStore = create<SecState>()(
                 bits: data.userBits || 0,
               },
               completedLessonIds: data.completedNodes || [],
+              isCloudSyncActive: true,
             });
             console.log('--- [IDENTITY_SYNC]: Global Dossier Hydrated ---');
           }
         } catch (error) {
-          console.error('--- [HYDRATION_ERROR]: Cloud Data Unreachable ---', error);
+          set({ isCloudSyncActive: false });
+          console.log('--- [IDENTITY_SYNC_OFFLINE]: Mirroring Local Archive ---');
         }
       },
 
