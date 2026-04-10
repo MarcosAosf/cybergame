@@ -21,6 +21,7 @@ export const TypewriterText: React.FC<TypewriterTextProps> = ({
 
   // Animation for the flickering cursor
   const cursorOpacity = useRef(new Animated.Value(0)).current;
+  const lastPlayRef = useRef(0);
 
   useEffect(() => {
     // Start cursor animation
@@ -37,10 +38,19 @@ export const TypewriterText: React.FC<TypewriterTextProps> = ({
         const char = text[currentIndex];
         setDisplayedText(prev => prev + char);
 
-        // Mechanical Throttling: Trigger sound every 2 characters to avoid driver saturations
-        if (currentIndex % 2 === 0) {
-          console.log('--- [SOUND_TRIGGERED]: terminal (Throttled) ---');
-          playEffect('terminal');
+        // Audio Throttling & Resource Guard
+        const now = Date.now();
+        if (currentIndex % 2 === 0 && (now - lastPlayRef.current) >= 60) {
+          lastPlayRef.current = now;
+          Promise.resolve().then(async () => {
+            try {
+              // Volume normalized to 0.3 for terminal feedback
+              await stopEffect('terminal');
+              await playEffect('terminal');
+            } catch (e) {
+              // Silence audio errors to prevent UI lag
+            }
+          });
         }
 
         currentIndex++;

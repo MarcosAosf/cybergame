@@ -10,6 +10,7 @@ import {
 
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useSecStore } from './src/store/useSecStore';
+import { initAudioSubsystem } from './src/hooks/useAudio';
 
 const SEC_THEME = {
   ...DefaultTheme,
@@ -26,6 +27,7 @@ const SEC_THEME = {
 
 export default function App() {
   const [isAppReady, setIsAppReady] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
   
   const [fontsLoaded] = useFonts({
     RobotoMono_400Regular,
@@ -35,11 +37,24 @@ export default function App() {
   const _hasHydrated = useSecStore(state => state._hasHydrated);
 
   useEffect(() => {
+    async function prepare() {
+      try {
+        await initAudioSubsystem();
+        setAudioReady(true);
+      } catch (e) {
+        console.warn('AUDIO_BOOT_FAILURE');
+        setAudioReady(true); // Fail-safe
+      }
+    }
+    prepare();
+  }, []);
+
+  useEffect(() => {
     // Phase 72 Restoration: Boot gatekeeper synchronized with local assets
-    if (fontsLoaded && _hasHydrated) {
+    if (fontsLoaded && _hasHydrated && audioReady) {
       setIsAppReady(true);
     }
-  }, [fontsLoaded, _hasHydrated]);
+  }, [fontsLoaded, _hasHydrated, audioReady]);
 
   if (!isAppReady) {
     return <View style={styles.gatekeeper} />;
