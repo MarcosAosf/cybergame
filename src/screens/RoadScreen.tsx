@@ -110,7 +110,22 @@ export const RoadScreen = () => {
           return MODULES.map((module, mIndex) => (
             <View key={module.id}>
               <View style={styles.moduleHeader}>
-                <Text style={styles.moduleTitle}>{module.title}</Text>
+                <View style={styles.moduleTitleRow}>
+                  <Text style={styles.moduleTitle}>{module.title.toUpperCase()}</Text>
+                  <View style={styles.progressContainer}>
+                    <View 
+                      style={[
+                        styles.progressBar, 
+                        { 
+                          width: `${(module.lessons.filter(l => completedLessonIds.includes(l.id)).length / module.lessons.length) * 100}%` 
+                        }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.progressText}>
+                    {Math.round((module.lessons.filter(l => completedLessonIds.includes(l.id)).length / module.lessons.length) * 100)}%
+                  </Text>
+                </View>
                 <View style={styles.moduleLine} />
               </View>
               {module.lessons.map((lesson, lIndex) => {
@@ -250,23 +265,46 @@ const styles = StyleSheet.create({
     paddingBottom: 150,
   },
   moduleHeader: {
-    marginTop: 40,
+    marginTop: 50,
     marginBottom: 20,
     paddingHorizontal: 20,
+  },
+  moduleTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
   moduleTitle: {
-    color: '#a0a0a0',
-    fontSize: 12,
-    fontFamily: 'RobotoMono_400Regular',
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-    marginRight: 10,
+    color: '#00d4ff',
+    fontSize: 10,
+    fontFamily: 'RobotoMono_700Bold',
+    letterSpacing: 1,
+    width: 140,
+  },
+  progressContainer: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 2,
+    marginHorizontal: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#111',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#00ff9f',
+    borderRadius: 2,
+  },
+  progressText: {
+    color: '#00ff9f',
+    fontSize: 9,
+    fontFamily: 'RobotoMono_700Bold',
+    minWidth: 35,
+    textAlign: 'right',
   },
   moduleLine: {
-    flex: 1,
     height: 1,
-    backgroundColor: '#333333',
+    backgroundColor: '#1a1a1a',
   },
 });

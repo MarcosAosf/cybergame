@@ -9,15 +9,20 @@ interface StatItemProps {
   color?: string;
 }
 
-export const StatItem: React.FC<StatItemProps> = ({ label, value, icon, color = "#00d4ff" }) => (
-  <View style={styles.container}>
-    <View style={styles.iconWrapper}>{icon}</View>
-    <View>
-      <Text style={{ ...styles.value, color: color || "#00d4ff" }}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
+export const StatItem: React.FC<StatItemProps> = ({ label, value, icon, color = "#00d4ff" }) => {
+  // --- SAFE_CAST: Terminal Fallback ---
+  const displayValue = (value === null || value === undefined) ? '---' : value;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.iconWrapper}>{icon}</View>
+      <View>
+        <Text style={{ ...styles.value, color: color || "#00d4ff" }}>{displayValue}</Text>
+        <Text style={styles.label}>{label}</Text>
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

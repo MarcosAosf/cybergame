@@ -14,6 +14,9 @@ import {
 } from 'react-native';
 import { COLORS } from '../theme/colors';
 import { TypewriterText } from '../components/TypewriterText';
+import { auth, db } from '../config/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export const SignUpScreen = ({ navigation }: any) => {
   const [name, setName] = useState('');
@@ -45,15 +48,15 @@ export const SignUpScreen = ({ navigation }: any) => {
       // 3. Create Firestore Document (Base Stats Phase 40)
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
-        name: name,
-        email: email,
-        totalXP: 0, // Experience (BYTES)
-        bits: 100, // Currency (BITS)
-        rank: 'Recruta',
-        completedLessonIds: [],
+        userName: name,
+        userEmail: email,
+        userXP: 0,
+        userBits: 0,
+        userRank: 'Recruta',
+        completedNodes: [],
         breachLogs: [],
         emergencyTasksCompleted: 0,
-        createdAt: new Date().toISOString(),
+        createdAt: serverTimestamp(),
       });
 
       console.log('--- [IDENTITY_CREATED]: New Operator Registered ---');

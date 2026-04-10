@@ -12,23 +12,26 @@ interface RoadNodeProps {
   variant?: 'default' | 'challenge';
 }
 
-export const RoadNode: React.FC<RoadNodeProps> = ({ 
-  title, 
-  isUnlocked, 
-  isCompleted, 
-  onPress, 
+export const RoadNode: React.FC<RoadNodeProps> = ({
+  title,
+  isUnlocked,
+  isCompleted,
+  onPress,
   index,
   variant = 'default'
 }) => {
   const { playEffect } = useAudio();
-  
+
   // Primary Pulse Animation (Shield)
   const pulseAnim = useRef(new Animated.Value(1)).current;
   // Secondary Halo Animation (Master Glow)
   const haloAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (isCompleted) {
+    // Pulse if completed OR if it's an unlocked challenge (next goal)
+    const shouldPulse = isCompleted || (variant === 'challenge' && isUnlocked);
+
+    if (shouldPulse) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 0.8, duration: 1500, useNativeDriver: true }),
@@ -36,17 +39,19 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
         ])
       ).start();
 
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(haloAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
-          Animated.timing(haloAnim, { toValue: 0, duration: 2000, useNativeDriver: true })
-        ])
-      ).start();
+      if (isCompleted) {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(haloAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+            Animated.timing(haloAnim, { toValue: 0, duration: 2000, useNativeDriver: true })
+          ])
+        ).start();
+      }
     } else {
       pulseAnim.setValue(1);
       haloAnim.setValue(0);
     }
-  }, [isCompleted, variant]);
+  }, [isCompleted, isUnlocked, variant]);
 
   const haloScale = haloAnim.interpolate({
     inputRange: [0, 1],
@@ -86,14 +91,14 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
       >
         {/* PURPLE MASTER HALO (Behind Shield) */}
         {isCompleted && variant === 'default' && (
-          <Animated.View 
+          <Animated.View
             style={[
-              styles.halo, 
-              { 
+              styles.halo,
+              {
                 transform: [{ scale: haloScale }],
                 opacity: haloOpacity
               }
-            ]} 
+            ]}
           />
         )}
 
@@ -102,8 +107,8 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
           <View style={[styles.challengeHalo, { opacity: 0.4 }]} />
         )}
 
-        <Animated.View style={{ opacity: isCompleted ? pulseAnim : 1 }}>
-          <Image 
+        <Animated.View style={{ opacity: (isCompleted || (variant === 'challenge' && isUnlocked)) ? pulseAnim : 1 }}>
+          <Image
             source={variant === 'challenge' ? require('../../assets/badges/certificacao1.png') : require('../../assets/branding/escudo.png')}
             style={[
               variant === 'challenge' ? styles.challengeImage : styles.image,
@@ -114,14 +119,14 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
           />
         </Animated.View>
         {!isUnlocked && variant !== 'challenge' && (
-           <View style={styles.lockOverlay}>
-             <Text style={styles.lockIcon}>🔒</Text>
-           </View>
+          <View style={styles.lockOverlay}>
+            <Text style={styles.lockIcon}>🔒</Text>
+          </View>
         )}
 
         {variant === 'challenge' && (
           <View style={styles.challengeIcon}>
-             <Text style={styles.challengeIconText}>★</Text>
+            <Text style={styles.challengeIconText}>★</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -164,9 +169,14 @@ const styles = StyleSheet.create({
     borderColor: '#00d4ff',
   },
   challengeNode: {
-    borderColor: '#1a2a6c',
+    borderColor: '#FFD700',
     borderWidth: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 5,
   },
   halo: {
     position: 'absolute',
@@ -181,7 +191,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: '#1a2a6c',
+    backgroundColor: '#FFD700',
     zIndex: -1,
   },
   image: {

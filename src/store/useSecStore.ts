@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// [FIREBASE_PURGE_COMPLETE]: Local Storage Primary engine active.
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
+// [FIREBASE_SYNC_ACTIVE]: Local Storage + Cloud Persistence engine.
 
 export type RankLevel = 'Novice' | 'Junior Analyst' | 'Security Specialist' | 'Elite Hacker' | 'Network Master' | 'Recruta';
 export type League = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
@@ -130,11 +132,52 @@ export const useSecStore = create<SecState>()(
       setHasHydrated: (state) => set({ _hasHydrated: state }),
 
       syncToFirestore: async () => {
-        // LOCAL_ONLY: Progress preserved in AsyncStorage
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        try {
+          const { user, stats, completedLessonIds } = get();
+          const userRef = doc(db, 'users', currentUser.uid);
+          
+          await updateDoc(userRef, {
+            userName: user.name,
+            userXP: user.totalXP,
+            userBits: stats.bits,
+            userRank: user.rank,
+            completedNodes: completedLessonIds,
+            lastSyncAt: new Date().toISOString()
+          });
+          console.log('--- [IDENTITY_SYNC]: Cloud Dossier Updated ---');
+        } catch (error) {
+          console.warn('--- [IDENTITY_SYNC_ERROR]: Failed to reach cloud ---', error);
+        }
       },
 
       loadUserData: async (uid: string) => {
-        // LOCAL_ONLY: Session persistence handled by persist middleware
+        try {
+          const userRef = doc(db, 'users', uid);
+          const userSnap = await getDoc(userRef);
+
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            set({
+              user: {
+                ...get().user,
+                name: data.userName || 'Operator',
+                totalXP: data.userXP || 0,
+                rank: (data.userRank as RankLevel) || 'Recruta',
+              },
+              stats: {
+                ...get().stats,
+                bits: data.userBits || 0,
+              },
+              completedLessonIds: data.completedNodes || [],
+            });
+            console.log('--- [IDENTITY_SYNC]: Global Dossier Hydrated ---');
+          }
+        } catch (error) {
+          console.error('--- [HYDRATION_ERROR]: Cloud Data Unreachable ---', error);
+        }
       },
 
       completeLesson: (lessonId, xpGain, bitsGain, hintsUsed, isAdvanced = false, isPerfect = false) => {

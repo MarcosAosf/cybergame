@@ -10,6 +10,8 @@ import { MODULES } from '../data/lessons';
 import { BlackMarket } from '../components/BlackMarket';
 import { BitWallet } from '../components/BitWallet';
 import { BitsToast } from '../components/BitsToast';
+import { db, auth } from '../config/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 export const ProfileScreen = () => {
   const { user, stats, completedLessonIds, breachLogs, isGraduated, graduationDate, buyHeart, buyCredits } = useSecStore();
@@ -22,8 +24,38 @@ export const ProfileScreen = () => {
   const viewShotRef = useRef(null);
 
   useEffect(() => {
-    // [LOCAL_MODE]: Profile loads immediately from secondary archive
-    setLoading(false);
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    setLoading(true);
+
+    // --- REALTIME_IDENTITY_SYNC: The Always-On Listener ---
+    const unsubscribe = onSnapshot(doc(db, 'users', currentUser.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        
+        // [ZUSTAND_PROPAGATION]: Keep global store in sync with cloud events
+        useSecStore.setState({
+          user: {
+            ...useSecStore.getState().user,
+            name: data.userName || 'Operator',
+            totalXP: data.userXP || 0,
+            rank: data.userRank || 'Recruta',
+          },
+          stats: {
+            ...useSecStore.getState().stats,
+            bits: data.userBits || 0,
+          },
+          completedLessonIds: data.completedNodes || [],
+        });
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error('--- [SYNC_FAILURE]: Dossier link broken ---', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   if (loading) {
@@ -39,11 +71,11 @@ export const ProfileScreen = () => {
     );
   }
 
-  const userDisplayName = user.name || 'Operator';
-  const userRank = user.rank || 'Recruta';
-  const userXP = user.totalXP || 0;
-  const userBits = stats.bits || 100;
-  const userCompletedIds = completedLessonIds || [];
+  const userDisplayName = user.name ?? 'Operator';
+  const userRank = user.rank ?? 'Recruta';
+  const userXP = Number(user.totalXP) || 0;
+  const userBits = Number(stats.bits) || 0;
+  const userCompletedIds = completedLessonIds ?? [];
 
   const getTierFromXP = (xp: number) => {
     if (xp >= 4001) return 9;
@@ -60,7 +92,6 @@ export const ProfileScreen = () => {
   const milestones = [0, 501, 1001, 1501, 2001, 2501, 3001, 3501, 4001, 4501];
   const playerTier = getTierFromXP(userXP);
   const nextMilestone = milestones[playerTier] || 4501;
-  const progressionPercent = Math.min(100, (userBits / (nextMilestone || 1)) * 100); // UI uses bits for logic usually but logic uses XP. Fix to XP.
   const progressionPercentXP = Math.min(100, (userXP / (nextMilestone || 1)) * 100);
 
   const getRoleColor = (tier: number) => {

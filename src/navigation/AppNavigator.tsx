@@ -14,7 +14,13 @@ import { COLORS } from '../theme/colors';
 const AuthStack = createStackNavigator();
 const MainTab = createBottomTabNavigator();
 
-// --- Auth Stack Removed ---
+// --- Auth Stack ---
+const AuthStackScreen = () => (
+  <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Screen name="Login" component={LoginScreen} />
+    <AuthStack.Screen name="SignUp" component={SignUpScreen} />
+  </AuthStack.Navigator>
+);
 
 // --- Tab Bar Component ---
 const TabBarIcon = ({ label, focused }: { label: string, focused: boolean }) => (
@@ -63,9 +69,8 @@ const MainTabNavigator = () => (
   </MainTab.Navigator>
 );
 
-export const AppNavigator = () => {
-  // STABLE_RECOVERY: Local-only baseline forces MainStack
-  return <MainTabNavigator />;
+export const AppNavigator = ({ user }: { user: any }) => {
+  return user ? <MainTabNavigator /> : <AuthStackScreen />;
 };
 
 const styles = StyleSheet.create({

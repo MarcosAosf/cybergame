@@ -11,6 +11,8 @@ import {
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useSecStore } from './src/store/useSecStore';
 import { initAudioSubsystem } from './src/hooks/useAudio';
+import { auth } from './src/config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const SEC_THEME = {
   ...DefaultTheme,
@@ -28,6 +30,8 @@ const SEC_THEME = {
 export default function App() {
   const [isAppReady, setIsAppReady] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
+  const [authResolved, setAuthResolved] = useState(false);
+  const [user, setUser] = useState<any>(null);
   
   const [fontsLoaded] = useFonts({
     RobotoMono_400Regular,
@@ -50,11 +54,38 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // --- FIREBASE_AUTH_BRIDGE: THE BOOLEAN SHIELD ---
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // [SHIELD]: Strict primitive serialization only
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+        });
+
+        // --- CLOUD_HANDSHAKE: Load Global Dossier ---
+        try {
+          await useSecStore.getState().loadUserData(firebaseUser.uid);
+        } catch (e) {
+          console.warn('// SYNC_LATENCY_DETECTED');
+        }
+
+        setAuthResolved(true);
+      } else {
+        setUser(null);
+        setAuthResolved(true);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     // Phase 72 Restoration: Boot gatekeeper synchronized with local assets
-    if (fontsLoaded && _hasHydrated && audioReady) {
+    if (fontsLoaded && _hasHydrated && audioReady && authResolved) {
       setIsAppReady(true);
     }
-  }, [fontsLoaded, _hasHydrated, audioReady]);
+  }, [fontsLoaded, _hasHydrated, audioReady, authResolved]);
 
   if (!isAppReady) {
     return <View style={styles.gatekeeper} />;
@@ -69,7 +100,7 @@ export default function App() {
           translucent={false}
           hidden={false}
         />
-        <AppNavigator />
+        <AppNavigator user={user} />
       </NavigationContainer>
     </SafeAreaProvider>
   );
