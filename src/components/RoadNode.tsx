@@ -20,7 +20,6 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
   index,
   variant = 'default'
 }) => {
-  const isEven = index % 2 === 0;
   const { playEffect } = useAudio();
   
   // Primary Pulse Animation (Shield)
@@ -60,17 +59,19 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
   });
 
   const handlePress = () => {
-    // Audio trigger removed from map nodes to prevent early firing
     onPress();
   };
 
-  const containerStyle = isEven 
-    ? { ...styles.nodeContainer, ...styles.alignLeft } 
-    : { ...styles.nodeContainer, ...styles.alignRight };
+  const isEven = index % 2 === 0;
+  const containerStyle = [
+    styles.nodeContainer,
+    isEven ? styles.alignLeft : styles.alignRight
+  ];
 
-  const titleStyle = !isUnlocked 
-    ? { ...styles.title, ...styles.lockedText } 
-    : styles.title;
+  const titleStyle = [
+    styles.title,
+    !isUnlocked ? styles.lockedText : null
+  ];
 
   return (
     <View style={containerStyle}>
@@ -124,7 +125,7 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
           </View>
         )}
       </TouchableOpacity>
-      <View style={styles.textContainer}>
+      <View style={[styles.textContainer, isEven ? { marginLeft: 20 } : { marginRight: 20 }]}>
         <Text style={variant === 'challenge' ? [titleStyle, { color: '#00ffff', textTransform: 'uppercase' }] : titleStyle}>{title}</Text>
         {isCompleted && <Text style={styles.completedTag}>// SINCRONIZADO</Text>}
         {variant === 'challenge' && <Text style={[styles.challengeTag, { color: '#a0a0a0' }]}>// PHYSICAL_MASTER_TEST</Text>}
@@ -135,17 +136,19 @@ export const RoadNode: React.FC<RoadNodeProps> = ({
 
 const styles = StyleSheet.create({
   nodeContainer: {
-    paddingVertical: 35,
-    width: '100%',
+    paddingVertical: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 30,
+    minWidth: 200,
   },
   alignLeft: {
+    alignSelf: 'flex-start',
     justifyContent: 'flex-start',
   },
   alignRight: {
-    justifyContent: 'flex-end',
+    alignSelf: 'flex-end',
+    justifyContent: 'flex-start',
     flexDirection: 'row-reverse',
   },
   node: {
@@ -232,15 +235,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   textContainer: {
-    marginHorizontal: 30,
-    maxWidth: 150,
+    maxWidth: 180,
     zIndex: 5,
   },
   title: {
-    color: '#ffffff',
+    color: '#00ff00',
     fontSize: 14,
-    fontWeight: 'bold',
     fontFamily: 'RobotoMono_700Bold',
+    letterSpacing: 0.5,
   },
   lockedText: {
     color: '#333',

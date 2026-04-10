@@ -105,35 +105,39 @@ export const RoadScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {MODULES.map((module, mIndex) => (
-          <View key={module.id}>
-            <View style={styles.moduleHeader}>
-              <Text style={styles.moduleTitle}>{module.title}</Text>
-              <View style={styles.moduleLine} />
-            </View>
-            {module.lessons.map((lesson, lIndex) => {
-              const prevLessonId = mIndex > 0 || lIndex > 0 
-                ? (lIndex > 0 ? module.lessons[lIndex-1].id : MODULES[mIndex-1].lessons[MODULES[mIndex-1].lessons.length-1].id)
-                : null;
-              
-              const isUnlocked = !prevLessonId || completedLessonIds.includes(prevLessonId);
-              const isCompleted = completedLessonIds.includes(lesson.id);
+        {(() => {
+          let cumulativeIndex = 0;
+          return MODULES.map((module, mIndex) => (
+            <View key={module.id}>
+              <View style={styles.moduleHeader}>
+                <Text style={styles.moduleTitle}>{module.title}</Text>
+                <View style={styles.moduleLine} />
+              </View>
+              {module.lessons.map((lesson, lIndex) => {
+                const nodeIndex = cumulativeIndex++;
+                const prevLessonId = mIndex > 0 || lIndex > 0 
+                  ? (lIndex > 0 ? module.lessons[lIndex-1].id : MODULES[mIndex-1].lessons[MODULES[mIndex-1].lessons.length-1].id)
+                  : null;
+                
+                const isUnlocked = !prevLessonId || completedLessonIds.includes(prevLessonId);
+                const isCompleted = completedLessonIds.includes(lesson.id);
 
-              return (
-                <RoadNode
-                  key={lesson.id}
-                  lesson={lesson}
-                  isUnlocked={isUnlocked}
-                  isCompleted={isCompleted}
-                  onPress={() => setSelectedLesson(lesson)}
-                  isChallenge={lesson.isChallenge}
-                  // Blue for Camada 1, Emerald Green for Camada 2
-                  color={mIndex === 1 ? '#00ff9f' : '#00d4ff'}
-                />
-              );
-            })}
-          </View>
-        ))}
+                return (
+                  <RoadNode
+                    key={lesson.id}
+                    id={lesson.id}
+                    title={lesson.title}
+                    index={nodeIndex}
+                    isUnlocked={isUnlocked}
+                    isCompleted={isCompleted}
+                    onPress={() => setSelectedLesson(lesson)}
+                    variant={lesson.isChallenge ? 'challenge' : 'default'}
+                  />
+                );
+              })}
+            </View>
+          ));
+        })()}
 
         {/* SYSTEM_BREACH NODE — single skull, exclusive emergency trigger */}
         {!!showEmergencyNode && (
