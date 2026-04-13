@@ -7,8 +7,8 @@ import { UserDossierModal } from '../components/UserDossierModal';
 import { LeagueBrowser } from '../components/LeagueBrowser';
 import { BitWallet } from '../components/BitWallet';
 import { BitsToast } from '../components/BitsToast';
-// import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-// import { db, auth } from '../config/firebase';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
 
 // Cloud Scale (Phase 40: Integrated)
 const getTierFromXP = (xp: number) => {
@@ -40,7 +40,7 @@ const getRole = (tier: number) => {
 
 const getRoleColor = (tier: number) => {
   if (tier >= 7) return '#bf00ff';
-  if (tier >= 4) return '#00d4ff'; 
+  if (tier >= 4) return '#00d4ff';
   if (tier >= 2) return '#00ff9f';
   return '#555';
 };
@@ -83,19 +83,19 @@ const ProgressionItem = React.memo(({ tier, playerTier, pulseAnim }: any) => {
       } : null
     ]}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-         <View style={isLocked ? { opacity: 0.5 } : {}}>
-           <CyberBadge rank={tier} size={40} />
-         </View>
-         <View style={{ marginLeft: 15 }}>
-           <Text style={[styles.rankName, { color: isLocked ? '#555' : roleColor }]}>{role}</Text>
-           {isCurrent && <Text style={{ color: '#fff', fontSize: 10, marginTop: 4, fontFamily: 'RobotoMono_700Bold' }}>// PATENTE ATUAL</Text>}
-           {isLocked && (
-             <Text style={{ color: '#444', fontSize: 9, marginTop: 4, fontFamily: 'RobotoMono_400Regular' }}>
-               // REQUER: {MILESTONES[tier-1]} BYTES
-             </Text>
-           )}
-           {!isCurrent && !isLocked && <Text style={{ color: '#00ff9f', fontSize: 10, marginTop: 4, fontFamily: 'RobotoMono_400Regular' }}>// SINCRONIZADO</Text>}
-         </View>
+        <View style={isLocked ? { opacity: 0.5 } : {}}>
+          <CyberBadge rank={tier} size={40} />
+        </View>
+        <View style={{ marginLeft: 15 }}>
+          <Text style={[styles.rankName, { color: isLocked ? '#555' : roleColor }]}>{role}</Text>
+          {isCurrent && <Text style={{ color: '#fff', fontSize: 10, marginTop: 4, fontFamily: 'RobotoMono_700Bold' }}>// PATENTE ATUAL</Text>}
+          {isLocked && (
+            <Text style={{ color: '#444', fontSize: 9, marginTop: 4, fontFamily: 'RobotoMono_400Regular' }}>
+               // REQUER: {MILESTONES[tier - 1]} BYTES
+            </Text>
+          )}
+          {!isCurrent && !isLocked && <Text style={{ color: '#00ff9f', fontSize: 10, marginTop: 4, fontFamily: 'RobotoMono_400Regular' }}>// SINCRONIZADO</Text>}
+        </View>
       </View>
     </Animated.View>
   );
@@ -108,15 +108,15 @@ const RankItem = React.memo(({ item, index, onOpenDossier, pulseAnim }: any) => 
   const roleColor = getRoleColor(tier);
   const glowColor = getGlowColor(tier);
   const idColor = getIDColor(index);
-  
+
   const nextMilestone = MILESTONES[Math.min(MILESTONES.length - 1, tier)];
   const threatLevel = Math.min(0.95, xp / (nextMilestone || 4501));
 
   return (
-    <AnimatedTouchable 
+    <AnimatedTouchable
       style={[
         styles.rankItem,
-        item.id === 'local_player' ? styles.playerItem : null,
+        item.id === auth.currentUser?.uid ? styles.playerItem : null,
         {
           borderColor: glowColor,
           borderWidth: 1.5,
@@ -131,14 +131,14 @@ const RankItem = React.memo(({ item, index, onOpenDossier, pulseAnim }: any) => 
           <View style={styles.nameRow}>
             <Text style={styles.rankName}>{item.name}</Text>
             <View style={styles.badgeContainer}>
-               <CyberBadge rank={tier} size={24} />
+              <CyberBadge rank={tier} size={24} />
             </View>
           </View>
-          
+
           <Text style={[styles.roleText, { color: roleColor }]}>{role}</Text>
-          
+
           <View style={styles.threatContainer}>
-             <View style={[styles.threatFill, { width: `${threatLevel * 100}%`, backgroundColor: roleColor }]} />
+            <View style={[styles.threatFill, { width: `${threatLevel * 100}%`, backgroundColor: roleColor }]} />
           </View>
         </View>
       </View>
@@ -147,7 +147,7 @@ const RankItem = React.memo(({ item, index, onOpenDossier, pulseAnim }: any) => 
         <Text style={styles.rankXP}>{xp}</Text>
         <Text style={styles.xpBox}>BYTES</Text>
         {item.bits !== undefined && (
-           <Text style={styles.bitsSecondary}>₿ {item.bits}</Text>
+          <Text style={styles.bitsSecondary}>₿ {item.bits}</Text>
         )}
       </View>
     </AnimatedTouchable>
@@ -157,7 +157,7 @@ const RankItem = React.memo(({ item, index, onOpenDossier, pulseAnim }: any) => 
 export const RankingScreen = () => {
   const { user, stats, emergencyTasksCompleted } = useSecStore();
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
-  
+
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [dossierVisible, setDossierVisible] = useState(false);
   const [leagueBrowserVisible, setLeagueBrowserVisible] = useState(false);
@@ -165,23 +165,52 @@ export const RankingScreen = () => {
 
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1500, useNativeDriver: true }),
-      ])
-    ).start();
+    // [GUARD]: Ensure listener only starts if session is hot
+    if (!auth.currentUser) {
+      setLoading(false);
+      return;
+    }
 
-    // LOCAL_MODE: Leaderboard initialized with local operator data only
-    setLeaderboard([{ id: 'local_player', name: user.name, totalXP: user.totalXP, bits: stats.bits }]);
-    setLoading(false);
+    const q = query(
+      collection(db, 'users'),
+      orderBy('userXP', 'desc'),
+      limit(10)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const users: any[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        users.push({
+          id: doc.id,
+          name: data.userName || 'Unknown Agent',
+          totalXP: data.userXP || 0,
+          bits: data.userBits || 0,
+          rank: data.userRank || 'Recruta',
+          emergencyTasksCompleted: data.emergencyTasksCompleted || 0,
+        });
+      });
+      setLeaderboard(users);
+      setLoading(false);
+      setAccessDenied(false);
+    }, (error) => {
+      console.warn('--- [RANKING_ERROR]: Sync Interrupted ---', error);
+      setLoading(false);
+      if (error.code === 'permission-denied') {
+        setAccessDenied(true);
+      }
+    });
+
+    return () => unsubscribe();
   }, [user.totalXP, stats.bits]);
 
   const playerPosition = useMemo(() => {
-    return 1; // [LOCAL_MODE]: Operator is always #1 in local grid
-  }, []);
+    const index = leaderboard.findIndex(u => u.id === auth.currentUser?.uid);
+    return index !== -1 ? index + 1 : '??';
+  }, [leaderboard]);
 
   const playerTier = useMemo(() => getTierFromXP(user.totalXP), [user.totalXP]);
   const playerRole = getRole(playerTier);
@@ -203,7 +232,7 @@ export const RankingScreen = () => {
   const displayedList = leaderboard.slice(0, 10);
 
   const handleOpenDossier = (item: any, role: string, tier: number) => {
-    const isPlayer = item.id === 'local_player';
+    const isPlayer = item.id === auth.currentUser?.uid;
     setSelectedUser({
       ...item,
       xp: item.totalXP,
@@ -221,36 +250,36 @@ export const RankingScreen = () => {
         borderColor: playerGlowColor,
       }]}>
         <View style={styles.dynamicHeader}>
-           <View style={[styles.headerIconBox, { borderColor: playerTier >= 7 ? playerRoleColor : '#222' }]}>
-             <CyberBadge rank={playerTier} size={70} />
-             {playerTier >= 7 && <View style={[styles.halo, { borderColor: playerRoleColor }]} />}
-           </View>
-           
-           <View style={styles.headerMeta}>
-             <View style={styles.titleRow}>
-               <Text style={[styles.patentTitle, { color: playerRoleColor }]}>{playerRole}</Text>
-               <View style={styles.headerRight}>
-                 <BitWallet />
-                 <TouchableOpacity
-                   onPress={() => setLeagueBrowserVisible(true)}
-                   style={styles.hierarchyBtn}
-                 >
-                   <Text style={styles.hierarchyText}>[HIERARCHY]</Text>
-                 </TouchableOpacity>
-               </View>
-             </View>
+          <View style={[styles.headerIconBox, { borderColor: playerTier >= 7 ? playerRoleColor : '#222' }]}>
+            <CyberBadge rank={playerTier} size={70} />
+            {playerTier >= 7 && <View style={[styles.halo, { borderColor: playerRoleColor }]} />}
+          </View>
 
-             <Animated.View style={{ opacity: pulseAnim }}>
-                <Text style={[styles.statusVerified, { color: playerRoleColor }]}>
-                  OPERATOR_CLEARANCE: LEVEL_{playerTier}
-                </Text>
-             </Animated.View>
+          <View style={styles.headerMeta}>
+            <View style={styles.titleRow}>
+              <Text style={[styles.patentTitle, { color: playerRoleColor }]}>{playerRole}</Text>
+              <View style={styles.headerRight}>
+                <BitWallet />
+                <TouchableOpacity
+                  onPress={() => setLeagueBrowserVisible(true)}
+                  style={styles.hierarchyBtn}
+                >
+                  <Text style={styles.hierarchyText}>[HIERARCHY]</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-             <View style={styles.headerStats}>
-                <Text style={styles.statLabel}>TOTAL_BYTES: <Text style={styles.statVal}>{user.totalXP}</Text></Text>
-                <Text style={styles.statLabel}>GRID_POS: <Text style={styles.statVal}>{playerPosition}</Text></Text>
-             </View>
-           </View>
+            <Animated.View style={{ opacity: pulseAnim }}>
+              <Text style={[styles.statusVerified, { color: playerRoleColor }]}>
+                OPERATOR_CLEARANCE: LEVEL_{playerTier}
+              </Text>
+            </Animated.View>
+
+            <View style={styles.headerStats}>
+              <Text style={styles.statLabel}>TOTAL_BYTES: <Text style={styles.statVal}>{user.totalXP}</Text></Text>
+              <Text style={styles.statLabel}>GRID_POS: <Text style={styles.statVal}>{playerPosition}</Text></Text>
+            </View>
+          </View>
         </View>
       </Animated.View>
 
@@ -264,13 +293,13 @@ export const RankingScreen = () => {
             })
           }
         ]} />
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.tab}
           onPress={() => handleTabSwitch('my_ranking')}
         >
           <Text style={[styles.tabLabel, activeTab === 'my_ranking' ? styles.activeTabLabel : null]}>MEU RANKING</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.tab}
           onPress={() => handleTabSwitch('top_10')}
         >
@@ -280,50 +309,58 @@ export const RankingScreen = () => {
 
       <View style={styles.listContainer}>
         {activeTab === 'my_ranking' ? (
-           <>
-             <Text style={styles.listHeader}>// PROGRESSION_SCALE_V3.8</Text>
-             <FlatList
-               data={ALL_RANKS_JOURNEY}
-               keyExtractor={(item) => item.toString()}
-               showsVerticalScrollIndicator={false}
-               renderItem={({ item }) => (
-                 <ProgressionItem 
-                   tier={item} 
-                   playerTier={playerTier}
-                   pulseAnim={pulseAnim}
-                 />
-               )}
-             />
-           </>
+          <>
+            <Text style={styles.listHeader}>// PROGRESSION_SCALE_V3.8</Text>
+            <FlatList
+              data={ALL_RANKS_JOURNEY}
+              keyExtractor={(item) => item.toString()}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <ProgressionItem
+                  tier={item}
+                  playerTier={playerTier}
+                  pulseAnim={pulseAnim}
+                />
+              )}
+            />
+          </>
         ) : (
-           <>
-             <Text style={styles.listHeader}>// RANKING_TRUE_POWER_GLOBAL</Text>
-             <FlatList
-               data={displayedList}
-               keyExtractor={(item) => item.id}
-               showsVerticalScrollIndicator={false}
-               renderItem={({ item, index }) => (
-                 <RankItem 
-                   item={item} 
-                   index={index} 
-                   onOpenDossier={handleOpenDossier}
-                   pulseAnim={pulseAnim}
-                 />
-               )}
-             />
-           </>
+          <>
+            <Text style={styles.listHeader}>// RANKING_TRUE_POWER_GLOBAL</Text>
+            {accessDenied ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorPulse}>[ACCESS_DENIED]</Text>
+                <Text style={styles.errorSub}>PERMISSÕES_INSUFICIENTES_NA_GRID</Text>
+                <Text style={styles.errorFix}>// REAUTENTICAÇÃO_REQUERIDA</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={displayedList}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item, index }) => (
+                  <RankItem
+                    item={item}
+                    index={index}
+                    onOpenDossier={handleOpenDossier}
+                    pulseAnim={pulseAnim}
+                  />
+                )}
+              />
+            )}
+          </>
         )}
       </View>
 
       {selectedUser && (
-        <UserDossierModal 
+        <UserDossierModal
           visible={Boolean(dossierVisible)}
           onClose={() => setDossierVisible(false)}
           operator={selectedUser}
         />
       )}
 
-      <LeagueBrowser 
+      <LeagueBrowser
         visible={Boolean(leagueBrowserVisible)}
         onClose={() => setLeagueBrowserVisible(false)}
       />
@@ -539,5 +576,29 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: 'RobotoMono_400Regular',
     marginTop: 4,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 15,
+  },
+  errorPulse: {
+    color: '#ff4b4b',
+    fontSize: 18,
+    fontFamily: 'RobotoMono_700Bold',
+    letterSpacing: 2,
+  },
+  errorSub: {
+    color: '#ff4b4b',
+    fontSize: 10,
+    fontFamily: 'RobotoMono_400Regular',
+    opacity: 0.7,
+  },
+  errorFix: {
+    color: '#444',
+    fontSize: 9,
+    fontFamily: 'RobotoMono_400Regular',
+    marginTop: 20,
   },
 });

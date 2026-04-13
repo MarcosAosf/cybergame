@@ -56,6 +56,8 @@ export default function App() {
   useEffect(() => {
     // --- FIREBASE_AUTH_BRIDGE: THE BOOLEAN SHIELD ---
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // --- THE BOOLEAN SHIELD ---
+      // We map the raw Firebase object to safely serializable primitives immediately
       if (firebaseUser) {
         setUser({
           uid: firebaseUser.uid,
@@ -63,7 +65,6 @@ export default function App() {
         });
 
         // --- CLOUD_HANDSHAKE: Load Global Dossier (Non-blocking) ---
-        // We use a Promise.race to ensure we don't hang the app if Firestore is slow/offline
         const syncTimeout = new Promise(resolve => setTimeout(resolve, 3000));
         
         try {

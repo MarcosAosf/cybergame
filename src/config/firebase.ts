@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeAuth, getReactNativePersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBJsB2LhNwU1oaYmzxXqXw0NigM93OlkzQ",
@@ -17,8 +18,12 @@ const firebaseConfig = {
 // Initialize Firebase only if no apps are detected to avoid dual-init crashes.
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export const auth = getAuth(app);
+// [PERSISTENCE]: Bridge JS SDK with Native AsyncStorage
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-console.log("--- [FIREBASE_SYSTEM]: Internal Bridge Initialized ---");
+console.log("--- [FIREBASE_SYSTEM]: Persistent Shield Initialized ---");
